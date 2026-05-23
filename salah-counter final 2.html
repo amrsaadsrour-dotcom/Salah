@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>عداد الركعات</title>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold:#c9a84c; --gold-l:#e8c97a; --gold-d:#7a6030;
+    --bg:#0a0a0f; --bg2:#11111a; --bg3:#1a1a28;
+    --text:#f0ead6; --dim:#7a7560;
+    --green:#4caf80; --purple:#9b59b6; --purple-l:#c39bd3; --red:#c0392b;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:'DM Mono',monospace; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; overflow-x:hidden; }
+  body::before { content:''; position:fixed; inset:0; pointer-events:none; background:radial-gradient(ellipse 80% 50% at 50% 0%, rgba(201,168,76,0.07) 0%, transparent 60%); }
+  .geo-c { position:fixed; border-radius:50%; border:1px solid rgba(201,168,76,0.06); top:50%; left:50%; transform:translate(-50%,-50%); pointer-events:none; }
+
+  .app { position:relative; z-index:10; width:100%; max-width:370px; padding:24px 18px 40px; display:flex; flex-direction:column; align-items:center; gap:16px; }
+
+  .hdr { text-align:center; }
+  .hdr-ar { font-family:'Amiri',serif; font-size:26px; color:var(--gold); display:block; margin-bottom:3px; }
+  .hdr-en { font-size:10px; letter-spacing:4px; color:var(--dim); text-transform:uppercase; }
+
+  .modes { display:flex; width:100%; background:var(--bg2); border:1px solid rgba(201,168,76,0.15); border-radius:12px; overflow:hidden; }
+  .mode-btn { flex:1; padding:10px; border:none; background:transparent; color:var(--dim); font-family:'DM Mono',monospace; font-size:10px; letter-spacing:2px; text-transform:uppercase; cursor:pointer; transition:all 0.2s; }
+  .mode-btn.on { background:var(--gold); color:var(--bg); font-weight:500; }
+
+  .card { width:100%; background:var(--bg2); border:1px solid rgba(201,168,76,0.18); border-radius:20px; padding:22px 18px; display:flex; flex-direction:column; align-items:center; gap:18px; }
+
+  .ring-wrap { position:relative; width:160px; height:160px; display:flex; align-items:center; justify-content:center; }
+  .ring-svg { position:absolute; inset:0; transform:rotate(-90deg); }
+  .ring-bg { fill:none; stroke:var(--bg3); stroke-width:5; }
+  .ring-fg { fill:none; stroke:var(--gold); stroke-width:5; stroke-linecap:round; stroke-dasharray:440; stroke-dashoffset:440; transition:stroke-dashoffset 0.7s cubic-bezier(0.4,0,0.2,1); filter:drop-shadow(0 0 8px rgba(201,168,76,0.5)); }
+  .ring-inner { text-align:center; z-index:1; }
+  .rak-num { font-size:60px; font-weight:300; color:var(--text); line-height:1; transition:all 0.25s; }
+  .rak-num.flash { color:var(--gold); transform:scale(1.1); }
+  .rak-lbl { font-size:10px; letter-spacing:3px; color:var(--dim); text-transform:uppercase; margin-top:3px; }
+
+  .sajda-wrap { text-align:center; width:100%; }
+  .sajda-lbl { font-size:10px; letter-spacing:3px; color:var(--dim); text-transform:uppercase; margin-bottom:8px; }
+  .dots { display:flex; gap:12px; justify-content:center; align-items:center; }
+  .dot { width:34px; height:34px; border-radius:50%; border:2px solid var(--bg3); display:flex; align-items:center; justify-content:center; font-family:'Amiri',serif; font-size:13px; color:var(--dim); transition:all 0.35s cubic-bezier(0.34,1.56,0.64,1); }
+  .dot.lit { background:var(--gold); border-color:var(--gold); color:var(--bg); box-shadow:0 0 14px rgba(201,168,76,0.4); transform:scale(1.1); }
+
+  .banner { width:100%; background:var(--bg3); border-radius:12px; padding:12px 14px; display:flex; align-items:center; gap:12px; }
+  .banner-icon { font-size:26px; min-width:32px; text-align:center; transition:all 0.35s; }
+  .banner-text { flex:1; }
+  .banner-ar { font-family:'Amiri',serif; font-size:16px; color:var(--gold); }
+  .banner-en { font-size:10px; letter-spacing:1px; color:var(--dim); margin-top:2px; }
+  .step-badge { font-size:9px; letter-spacing:1px; padding:2px 8px; border-radius:100px; background:rgba(201,168,76,0.1); border:1px solid rgba(201,168,76,0.2); color:var(--gold); white-space:nowrap; }
+
+  /* Heard transcript */
+  .heard-box { width:100%; text-align:center; min-height:24px; }
+  .heard-txt { font-family:'Amiri',serif; font-size:15px; color:var(--purple-l); opacity:0; transition:opacity 0.3s; display:inline-block; }
+  .heard-txt.show { opacity:1; }
+
+  /* Listening pulse */
+  @keyframes breathe { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.4);opacity:0.5} }
+  .pulse { width:12px; height:12px; border-radius:50%; background:var(--green); box-shadow:0 0 8px var(--green); animation:breathe 1.4s ease-in-out infinite; display:inline-block; }
+  .pulse.off { background:var(--bg3); box-shadow:none; animation:none; }
+
+  .sim { width:100%; background:var(--bg2); border:1px solid rgba(74,144,217,0.2); border-radius:16px; padding:14px; flex-direction:column; gap:10px; }
+  .sim.show { display:flex; }
+  .sim-title { font-size:10px; letter-spacing:2px; color:#4a90d9; text-transform:uppercase; }
+  .sim-row { display:flex; gap:8px; }
+  .sbtn { flex:1; padding:10px 4px; border:1px solid; border-radius:10px; background:transparent; font-family:'DM Mono',monospace; font-size:9px; letter-spacing:1px; cursor:pointer; transition:all 0.15s; text-align:center; line-height:1.5; }
+  .sbtn:active { transform:scale(0.95); }
+  .sbtn.t { border-color:var(--gold-d); color:var(--gold); }
+  .sbtn.t:hover { background:rgba(201,168,76,0.1); }
+  .sbtn.s { border-color:#2e7d52; color:var(--green); }
+  .sbtn.s:hover { background:rgba(76,175,128,0.1); }
+  .sbtn.sl { border-color:#2e6b8a; color:#7ec8e3; }
+  .sbtn.sl:hover { background:rgba(74,144,217,0.1); }
+  .sim-hint { font-size:10px; color:var(--dim); line-height:1.9; }
+
+  .voice-info { width:100%; background:var(--bg2); border:1px solid rgba(76,175,128,0.15); border-radius:16px; padding:14px; flex-direction:column; gap:8px; }
+  .voice-info.show { display:flex; }
+  .voice-info-title { font-size:10px; letter-spacing:2px; color:var(--green); text-transform:uppercase; }
+  .voice-info-body { font-size:11px; color:var(--dim); line-height:2; }
+
+  .ctrl { display:flex; align-items:center; gap:10px; width:100%; }
+  .ctrl-lbl { font-size:10px; letter-spacing:2px; color:var(--dim); text-transform:uppercase; white-space:nowrap; min-width:86px; }
+  input[type=range] { -webkit-appearance:none; flex:1; height:2px; background:var(--bg3); border-radius:2px; outline:none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:13px; height:13px; border-radius:50%; background:var(--gold); cursor:pointer; }
+  .ctrl-val { font-size:11px; color:var(--gold); min-width:28px; text-align:right; }
+
+  .btns { display:flex; gap:10px; width:100%; }
+  .btn { flex:1; padding:12px; border:none; border-radius:12px; font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px; text-transform:uppercase; cursor:pointer; transition:all 0.2s; }
+  .btn-p { background:var(--gold); color:var(--bg); font-weight:500; }
+  .btn-p:hover { background:var(--gold-l); }
+  .btn-p.stop { background:var(--red); color:#fff; }
+  .btn-s { background:transparent; color:var(--dim); border:1px solid var(--bg3); }
+  .btn-s:hover { border-color:var(--gold-d); color:var(--text); }
+
+  .status-row { display:flex; align-items:center; gap:8px; font-size:10px; color:var(--dim); }
+
+  .log { width:100%; background:var(--bg2); border:1px solid rgba(201,168,76,0.07); border-radius:12px; padding:9px 13px; max-height:80px; overflow-y:auto; display:flex; flex-direction:column-reverse; gap:2px; }
+  .log-e { font-size:11px; color:var(--dim); display:flex; justify-content:space-between; gap:6px; }
+  .log-e.g { color:var(--green); }
+  .log-e.o { color:var(--gold); }
+  .log-e.p { color:var(--purple-l); }
+  .log-t { color:var(--bg3); font-size:10px; flex-shrink:0; }
+
+  .toast { position:fixed; top:20px; left:50%; transform:translateX(-50%) translateY(-80px); padding:10px 22px; border-radius:100px; font-size:16px; font-weight:500; transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1); z-index:100; white-space:nowrap; font-family:'Amiri',serif; pointer-events:none; }
+  .toast.show { transform:translateX(-50%) translateY(0); }
+  .toast.gold { background:var(--gold); color:var(--bg); }
+  .toast.green { background:var(--green); color:var(--bg); }
+  .toast.purple { background:var(--purple); color:#fff; }
+</style>
+</head>
+<body>
+
+<div class="geo-c" style="width:580px;height:580px"></div>
+<div class="geo-c" style="width:370px;height:370px"></div>
+<div class="toast" id="toast"></div>
+
+<div class="app">
+
+  <div class="hdr">
+    <span class="hdr-ar">عدّاد الركعات</span>
+    <span class="hdr-en">Rak3a · Sajda Counter</span>
+  </div>
+
+  <div class="modes">
+    <button class="mode-btn on" id="btnSim"  onclick="setMode('sim')">👆 Test Mode</button>
+    <button class="mode-btn"    id="btnReal" onclick="setMode('real')">🎙 Voice Mode</button>
+  </div>
+
+  <div class="card">
+
+    <!-- Rak3a ring -->
+    <div class="ring-wrap">
+      <svg class="ring-svg" viewBox="0 0 160 160">
+        <circle class="ring-bg" cx="80" cy="80" r="70"/>
+        <circle class="ring-fg" id="ringFg" cx="80" cy="80" r="70"/>
+      </svg>
+      <div class="ring-inner">
+        <div class="rak-num" id="rakNum">0</div>
+        <div class="rak-lbl">rak3at</div>
+      </div>
+    </div>
+
+    <!-- Sajda dots -->
+    <div class="sajda-wrap">
+      <div class="sajda-lbl">Sajdat this rak3a</div>
+      <div class="dots">
+        <div class="dot" id="d1">١</div>
+        <div style="color:var(--bg3);font-size:16px">·</div>
+        <div class="dot" id="d2">٢</div>
+      </div>
+    </div>
+
+    <!-- State banner -->
+    <div class="banner">
+      <div class="banner-icon" id="bIcon">🤲</div>
+      <div class="banner-text">
+        <div class="banner-ar" id="bAr">قل الله أكبر لتبدأ</div>
+        <div class="banner-en" id="bEn">Say Allahu Akbar to open prayer</div>
+      </div>
+      <div class="step-badge" id="stepBadge">إحرام</div>
+    </div>
+
+    <!-- What was heard -->
+    <div class="heard-box">
+      <span class="heard-txt" id="heardTxt"></span>
+    </div>
+
+  </div>
+
+  <!-- Test Mode panel -->
+  <div class="sim" id="simPanel" style="display:none">
+    <div class="sim-title">🧪 Simulate voice events</div>
+    <div class="sim-row">
+      <button class="sbtn t"  onclick="onTrigger('takbeer','الله أكبر')">🗣 الله أكبر<br><span style="opacity:.5;font-size:8px">takbeer</span></button>
+      <button class="sbtn s"  onclick="onTrigger('sami3','سمع الله لمن حمده')">🎵 سمع الله<br><span style="opacity:.5;font-size:8px">rising from ruku</span></button>
+      <button class="sbtn sl" onclick="onTrigger('tasleem','السلام عليكم')">☮️ السلام<br><span style="opacity:.5;font-size:8px">ends prayer</span></button>
+    </div>
+    <div class="sim-hint">
+      <b style="color:var(--gold)">Full sequence:</b><br>
+      🗣 (open) → 🗣 (ruku) → 🎵 ✓rak3a → 🗣 (sajda1)<br>
+      → 🗣 (sit) → 🗣 (sajda2) → 🗣 (stand)<br>
+      After rak3a 2 in 3/4: تشهد أول → 🗣 continue<br>
+      After last rak3a: تشهد أخير → ☮️ done
+    </div>
+  </div>
+
+  <!-- Voice Mode panel -->
+  <div class="voice-info" id="voicePanel" style="display:none">
+    <div class="voice-info-title">🎙 Listening for</div>
+    <div class="voice-info-body">
+      <span style="color:var(--gold)">الله أكبر</span> — advances state<br>
+      <span style="color:var(--green)">سمع الله لمن حمده</span> — counts rak3a<br>
+      <span style="color:#7ec8e3">السلام عليكم</span> — ends prayer
+    </div>
+    <div style="font-size:10px;color:var(--dim)">💡 Best in Chrome · speak clearly</div>
+  </div>
+
+  <!-- Max rak3at control -->
+  <div class="ctrl">
+    <span class="ctrl-lbl">Max Rak3at</span>
+    <input type="range" id="maxR" min="2" max="4" value="4" step="1" oninput="document.getElementById('maxRv').textContent=this.value;updateRing()">
+    <span class="ctrl-val" id="maxRv">4</span>
+  </div>
+
+  <!-- Buttons -->
+  <div class="btns">
+    <button class="btn btn-p" id="voiceBtn" style="display:none" onclick="toggleVoice()">Start Listening</button>
+    <button class="btn btn-s" onclick="resetAll()">Reset</button>
+  </div>
+
+  <!-- Mic status -->
+  <div class="status-row" id="statusRow" style="display:none">
+    <div class="pulse off" id="pulseEl"></div>
+    <span id="statusLbl">Not listening</span>
+  </div>
+
+  <!-- Log -->
+  <div class="log" id="log">
+    <div class="log-e">— ready —<span class="log-t"></span></div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  STATE MACHINE
+//  One trigger = one step. No double-firing.
+// ═══════════════════════════════════════════════════════════
+
+const PHASES = {
+  IDLE:       'idle',
+  QIYAM:      'qiyam',
+  RUKU:       'ruku',
+  IETIDAL:    'ietidal',   // standing after ruku, before sujood
+  SUJOOD1:    'sujood1',
+  SIT:        'sit',
+  SUJOOD2:    'sujood2',
+  TASH_SHORT: 'tash_short',
+  TASH_FULL:  'tash_full',
+  DONE:       'done',
+};
+
+const PHASE_UI = {
+  idle:       { icon:'🤲', ar:'قل الله أكبر لتبدأ',    en:'Say Allahu Akbar to open prayer',          step:'إحرام'    },
+  qiyam:      { icon:'🧍', ar:'قيام',                   en:'Standing — Allahu Akbar → ruku',           step:'قيام'     },
+  ruku:       { icon:'🙇', ar:'ركوع',                   en:'Bowing — say سمع الله to rise',            step:'ركوع'     },
+  ietidal:    { icon:'🧍', ar:'اعتدال',                 en:'Standing — Allahu Akbar → first sajda',    step:'اعتدال'   },
+  sujood1:    { icon:'🙏', ar:'سجدة أولى',              en:'First sajda — Allahu Akbar → sit',         step:'سجدة ١'   },
+  sit:        { icon:'🪑', ar:'جلسة',                   en:'Sitting — Allahu Akbar → second sajda',   step:'جلسة'     },
+  sujood2:    { icon:'🙏', ar:'سجدة ثانية',             en:'Second sajda — Allahu Akbar → stand',     step:'سجدة ٢'   },
+  tash_short: { icon:'🤲', ar:'التشهد الأول',            en:'Short tashahhud — Allahu Akbar → continue', step:'تشهد أول' },
+  tash_full:  { icon:'🤲', ar:'التشهد الأخير',           en:'Full tashahhud — السلام عليكم → done',     step:'تشهد أخير'},
+  done:       { icon:'✅', ar:'الحمد لله',               en:'Prayer complete!',                         step:'تمّت'     },
+};
+
+const ARABIC_NUMS = ['','الأولى','الثانية','الثالثة','الرابعة'];
+
+// ── App state ──
+let phase      = 'idle';
+let rak3aCount = 0;
+let sajdaCount = 0;
+
+// ── Anti double-fire guard ──
+// After a trigger is accepted, we lock the state machine for LOCK_MS.
+// Speech recognition fires interim + final results for the same word,
+// this ensures only the FIRST one goes through.
+const LOCK_MS  = 1500;
+let lockedUntil = 0;
+
+// ── UI helpers ──────────────────────────────────────────────
+
+function setPhase(p) {
+  phase = p;
+  const u = PHASE_UI[p];
+  document.getElementById('bIcon').textContent     = u.icon;
+  document.getElementById('bAr').textContent       = u.ar;
+  document.getElementById('bEn').textContent       = u.en;
+  document.getElementById('stepBadge').textContent = u.step;
+}
+
+function updateRing() {
+  const max = parseInt(document.getElementById('maxR').value);
+  document.getElementById('ringFg').style.strokeDashoffset = 440 * (1 - Math.min(rak3aCount/max, 1));
+}
+
+function flashNum() {
+  const el = document.getElementById('rakNum');
+  el.classList.add('flash');
+  setTimeout(() => el.classList.remove('flash'), 300);
+}
+
+function updateDots() {
+  document.getElementById('d1').className = 'dot' + (sajdaCount >= 1 ? ' lit' : '');
+  document.getElementById('d2').className = 'dot' + (sajdaCount >= 2 ? ' lit' : '');
+}
+
+function showHeard(txt) {
+  const el = document.getElementById('heardTxt');
+  el.textContent = txt;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+let toastT;
+function showToast(msg, cls) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = `toast ${cls} show`;
+  clearTimeout(toastT);
+  toastT = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+function addLog(text, cls) {
+  const log = document.getElementById('log');
+  const e   = document.createElement('div');
+  e.className = 'log-e' + (cls ? ' '+cls : '');
+  const ts  = new Date().toLocaleTimeString('en',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  e.innerHTML = `${text}<span class="log-t">${ts}</span>`;
+  log.prepend(e);
+  if (log.children.length > 30) log.removeChild(log.lastChild);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  TRIGGER — the only entry point into the state machine
+//  type: 'takbeer' | 'sami3' | 'tasleem'
+//  heard: raw transcript string (for display)
+// ═══════════════════════════════════════════════════════════
+function onTrigger(type, heard) {
+  const now = Date.now();
+
+  // ── Lock guard: ignore if locked ──
+  if (now < lockedUntil) {
+    console.log(`[LOCKED] ignored ${type} — ${lockedUntil - now}ms remaining`);
+    return;
+  }
+
+  // ── Ignore if prayer done ──
+  if (phase === 'done') return;
+
+  // ── Only accept what makes sense for current phase ──
+  const valid = isValidTransition(phase, type);
+  if (!valid) {
+    console.log(`[IGNORED] ${type} not valid in phase ${phase}`);
+    return;
+  }
+
+  // ── Lock immediately ──
+  lockedUntil = now + LOCK_MS;
+
+  // ── Show heard word ──
+  if (heard) showHeard(heard);
+
+  // ── Advance state machine ──
+  advanceState(type);
+}
+
+function isValidTransition(ph, type) {
+  if (type === 'takbeer') {
+    return ['idle','qiyam','ruku','ietidal','sujood1','sit','sujood2','tash_short'].includes(ph);
+  }
+  if (type === 'sami3') {
+    return ph === 'ruku';
+  }
+  if (type === 'tasleem') {
+    return ph === 'tash_full';
+  }
+  return false;
+}
+
+function advanceState(type) {
+  const max = parseInt(document.getElementById('maxR').value);
+
+  // ── IDLE: تكبيرة الإحرام ──
+  if (phase === 'idle' && type === 'takbeer') {
+    setPhase('qiyam');
+    showToast('الله أكبر 🤲', 'gold');
+    addLog('🕌 تكبيرة الإحرام — prayer opened', 'o');
+    return;
+  }
+
+  // ── QIYAM → RUKU ──
+  if (phase === 'qiyam' && type === 'takbeer') {
+    setPhase('ruku');
+    addLog('↓ ركوع — الله أكبر');
+    return;
+  }
+
+  // ── RUKU → IETIDAL (سمع الله counts rak3a) ──
+  if (phase === 'ruku' && type === 'sami3') {
+    rak3aCount++;
+    sajdaCount = 0;
+    document.getElementById('rakNum').textContent = rak3aCount;
+    flashNum(); updateRing(); updateDots();
+    setPhase('ietidal');
+    addLog(`✓ ركعة ${rak3aCount} — سمع الله لمن حمده`, 'g');
+    showToast(`ركعة ${ARABIC_NUMS[rak3aCount]||rak3aCount}`, 'green');
+    return;
+  }
+
+  // ── IETIDAL → SUJOOD1 ──
+  if (phase === 'ietidal' && type === 'takbeer') {
+    sajdaCount = 1; updateDots();
+    setPhase('sujood1');
+    addLog('↓ سجدة أولى — الله أكبر', 'p');
+    showToast('سجدة ١', 'purple');
+    return;
+  }
+
+  // ── SUJOOD1 → SIT ──
+  if (phase === 'sujood1' && type === 'takbeer') {
+    setPhase('sit');
+    addLog('↑ جلسة — الله أكبر');
+    return;
+  }
+
+  // ── SIT → SUJOOD2 ──
+  if (phase === 'sit' && type === 'takbeer') {
+    sajdaCount = 2; updateDots();
+    setPhase('sujood2');
+    addLog('↓ سجدة ثانية — الله أكبر', 'p');
+    showToast('سجدة ٢', 'purple');
+    return;
+  }
+
+  // ── SUJOOD2 → stand / tashahhud ──
+  if (phase === 'sujood2' && type === 'takbeer') {
+    sajdaCount = 0; updateDots();
+    if (rak3aCount === 2 && max > 2) {
+      setPhase('tash_short');
+      addLog('🤲 التشهد الأول', 'o');
+      showToast('التشهد الأول', 'gold');
+    } else if (rak3aCount >= max) {
+      setPhase('tash_full');
+      addLog('🤲 التشهد الأخير', 'o');
+      showToast('التشهد الأخير', 'gold');
+    } else {
+      setPhase('qiyam');
+      addLog(`↑ قيام — الله أكبر · rak3a ${rak3aCount+1}`);
+    }
+    return;
+  }
+
+  // ── TASH_SHORT → QIYAM ──
+  if (phase === 'tash_short' && type === 'takbeer') {
+    setPhase('qiyam');
+    addLog('↑ قيام — الله أكبر · continuing');
+    return;
+  }
+
+  // ── TASH_FULL → DONE ──
+  if (phase === 'tash_full' && type === 'tasleem') {
+    setPhase('done');
+    stopVoice();
+    addLog('✨ السلام عليكم — الحمد لله', 'o');
+    showToast('السلام عليكم 🤲', 'green');
+    return;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SPEECH RECOGNITION
+//  Key fix: only process FINAL results (not interim).
+//  Interim results are what caused double-triggering before.
+// ═══════════════════════════════════════════════════════════
+
+const KEYWORDS = {
+  takbeer: ['الله أكبر','الله اكبر','اللهأكبر','allahu akbar','allahu','akbar','اكبر','أكبر'],
+  sami3:   ['سمع الله لمن حمده','سمع الله','سمع','لمن حمده','sami3','sami allahu','semi allah'],
+  tasleem: ['السلام عليكم','السلام عليكم ورحمة','السلام','assalamu alaykum','salam','salaam'],
+};
+
+function matchKeyword(transcript) {
+  const t = transcript.trim().toLowerCase();
+  for (const [type, words] of Object.entries(KEYWORDS)) {
+    for (const w of words) {
+      if (t.includes(w.toLowerCase())) return type;
+    }
+  }
+  return null;
+}
+
+let recognition = null;
+let voiceOn     = false;
+
+function startVoice() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    addLog('⚠ Speech recognition not supported — use Chrome');
+    return;
+  }
+
+  recognition = new SR();
+  recognition.lang            = 'ar-SA';
+  recognition.continuous      = true;
+  recognition.interimResults  = false;  // ← CRITICAL: final results only
+  recognition.maxAlternatives = 5;
+
+  recognition.onstart = () => {
+    voiceOn = true;
+    setPulse(true);
+    document.getElementById('statusLbl').textContent = 'Listening...';
+    addLog('🎙 Voice recognition started');
+    requestWakeLock();
+  };
+
+  recognition.onresult = (e) => {
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      // Only process FINAL results
+      if (!e.results[i].isFinal) continue;
+
+      // Try all alternatives (browser gives multiple guesses)
+      for (let a = 0; a < e.results[i].length; a++) {
+        const transcript = e.results[i][a].transcript;
+        const type = matchKeyword(transcript);
+        if (type) {
+          onTrigger(type, transcript);
+          break; // found a match, stop checking alternatives
+        }
+      }
+    }
+  };
+
+  recognition.onerror = (e) => {
+    if (e.error === 'not-allowed') {
+      addLog('⚠ Mic permission denied');
+      setPulse(false);
+      voiceOn = false;
+      document.getElementById('voiceBtn').textContent = 'Start Listening';
+      document.getElementById('voiceBtn').classList.remove('stop');
+    } else if (e.error === 'no-speech') {
+      // Normal — just keep going
+    } else {
+      addLog(`⚠ ${e.error}`);
+    }
+  };
+
+  recognition.onend = () => {
+    // Auto-restart to keep listening continuously
+    if (voiceOn) {
+      setTimeout(() => {
+        try { recognition.start(); } catch(e) {}
+      }, 200);
+    }
+  };
+
+  try {
+    recognition.start();
+  } catch(e) {
+    addLog('⚠ Could not start — try refreshing');
+  }
+}
+
+function stopVoice() {
+  voiceOn = false;
+  if (recognition) { try { recognition.stop(); } catch(e) {} recognition = null; }
+  setPulse(false);
+  releaseWakeLock();
+  document.getElementById('statusLbl').textContent = 'Not listening';
+  document.getElementById('voiceBtn').textContent  = 'Start Listening';
+  document.getElementById('voiceBtn').classList.remove('stop');
+  addLog('Voice recognition stopped');
+}
+
+function toggleVoice() {
+  if (voiceOn) {
+    stopVoice();
+  } else {
+    resetAll();
+    startVoice();
+    document.getElementById('voiceBtn').textContent = 'Stop Listening';
+    document.getElementById('voiceBtn').classList.add('stop');
+  }
+}
+
+function setPulse(on) {
+  document.getElementById('pulseEl').className = 'pulse' + (on ? '' : ' off');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  MODE & RESET
+// ═══════════════════════════════════════════════════════════
+let currentMode = 'sim';
+
+function setMode(m) {
+  currentMode = m;
+  document.getElementById('btnSim').className  = 'mode-btn' + (m==='sim'  ? ' on' : '');
+  document.getElementById('btnReal').className = 'mode-btn' + (m==='real' ? ' on' : '');
+  document.getElementById('simPanel').style.display   = m==='sim'  ? 'flex' : 'none';
+  document.getElementById('voicePanel').style.display = m==='real' ? 'flex' : 'none';
+  document.getElementById('voiceBtn').style.display   = m==='real' ? ''     : 'none';
+  document.getElementById('statusRow').style.display  = m==='real' ? 'flex' : 'none';
+  if (m === 'sim' && voiceOn) stopVoice();
+  resetAll();
+  addLog(m === 'sim' ? 'Test Mode — tap buttons to simulate' : 'Voice Mode — tap Start Listening');
+}
+
+function resetAll() {
+  rak3aCount = 0; sajdaCount = 0; lockedUntil = 0;
+  document.getElementById('rakNum').textContent = '0';
+  setPhase('idle'); updateRing(); updateDots();
+}
+
+
+// ═══════════════════════════════════════════════════════════
+//  WAKE LOCK — keeps screen on while listening
+// ═══════════════════════════════════════════════════════════
+let wakeLock = null;
+
+async function requestWakeLock() {
+  if ('wakeLock' in navigator) {
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      addLog('🔆 Screen will stay on');
+      wakeLock.addEventListener('release', () => {
+        // Re-acquire if still listening
+        if (voiceOn) requestWakeLock();
+      });
+    } catch(e) {
+      addLog('⚠ Could not keep screen on: ' + e.message);
+    }
+  }
+}
+
+function releaseWakeLock() {
+  if (wakeLock) {
+    wakeLock.release();
+    wakeLock = null;
+  }
+}
+
+// Re-acquire wake lock when page becomes visible again
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && voiceOn) {
+    requestWakeLock();
+  }
+});
+
+// Init
+setMode('sim');
+</script>
+</body>
+</html>
